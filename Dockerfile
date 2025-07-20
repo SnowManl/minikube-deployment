@@ -1,8 +1,23 @@
 FROM node:14
+
+# Create app directory
 WORKDIR /usr/src/app
+
+# Install app dependencies
 COPY package*.json ./
-RUN npm install
-RUN npm install express
+
+# Install exact versions
+RUN npm install --no-optional --production
+
+# Bundle app source
 COPY . .
+
+# Fix permissions
+RUN chown -R node:node .
+USER node
+
+# Expose port
 EXPOSE 3000
-CMD [ "node", "server.js" ]
+
+# Run the application
+CMD ["node", "server.js"]
