@@ -1,57 +1,35 @@
-name: Deploy to Minikube using GitHub Actions
-
-on: [push]
-  
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Setup Minikube
-      uses: medyagh/setup-minikube@master
-      with:
-        cpus: 2
-        memory: 4096
-        driver: docker
-        kubernetes-version: v1.24.0
-
-    - name: Verify cluster
-      run: kubectl get pods -A
-      
-    - name: Build Docker image
-      run: |
-        # Set Docker environment
-        eval $(minikube -p minikube docker-env)
-        
-        # Build with detailed logs
-        docker build -t devopshint/node-app:latest . 2>&1 | tee docker-build.log
-        
-        # Verify image
-        docker images | grep node-app
-        
-    - name: Deploy application
-      run: kubectl apply -f k8s-node-app.yaml
-      
-    - name: Wait for deployment
-      run: |
-        # Wait for pod to start
-        kubectl wait --for=condition=ready pod -l app=nodejs-app --timeout=120s
-        
-        # Show detailed pod status
-        kubectl get pods -o wide
-        kubectl describe pod -l app=nodejs-app
-        
-    - name: Check application logs
-      run: kubectl logs -l app=nodejs-app --tail=50
-      
-    - name: Verify service
-      run: |
-        # Get service URL
-        SERVICE_URL=$(minikube service nodejs-app --url)
-        echo "Service URL: $SERVICE_URL"
-        
-        # Test with curl
-        curl -v --retry 5 --retry-delay 10 --connect-timeout 30 $SERVICE_URL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app
+  labels:
+    app: nodejs-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-app
+    spec:
+      containers:
+      - name: nodejs-app
+        image: "devopshint/node-app:latest"
+        imagePullPolicy: Never # Add this to ensure the local Minikube image is used
+        ports:
+        - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-app
+spec:
+  selector:
+    app: nodejs-app
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
