@@ -8,19 +8,32 @@ jobs:
     name: build Node.js Docker Image and deploy to minikube
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4 # Updated to v4
+      uses: actions/checkout@v4
+    
     - name: Start minikube
       uses: medyagh/setup-minikube@master
+      
     - name: Build image
       run: |
         eval $(minikube -p minikube docker-env)
         docker build -t devopshint/node-app:latest .
         echo "verifying images:"
         docker images
+        
     - name: Deploy to minikube
-      run: kubectl apply -f k8s-node-app.yaml # Corrected syntax
-    - name: Verify deployment
-      run: kubectl get all
+      run: kubectl apply -f k8s-node-app.yaml
+
+    # -- NEW STEPS TO WAIT AND VERIFY --
+    - name: Wait for deployment to be ready
+      run: kubectl wait --for=condition=available --timeout=120s deployment/nodejs-app
+      
+    - name: Verify deployment status
+      run: |
+        echo "--- Pod Status ---"
+        kubectl get pods
+        echo "--- Service Status ---"
+        kubectl get services
+
     - name: Test service URLs
       run: |
         minikube service list
