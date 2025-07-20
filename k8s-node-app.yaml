@@ -1,45 +1,41 @@
-name: Deploy to Minikube using GitHub Actions
-
-on: [push]
-  
-jobs:
-  job1:
-    runs-on: ubuntu-latest
-    name: build Node.js Docker Image and deploy to minikube
-    steps:
-    - uses: actions/checkout@v2
-    - name: Start minikube
-      uses: medyagh/setup-minikube@master
-      with:
-        cpus: 2
-        memory: 4000
-        driver: docker
-
-    - name: Try the cluster
-      run: kubectl get pods -A
-      
-    - name: Build image
-      run: |
-          eval $(minikube -p minikube docker-env)
-          docker build -t devopshint/node-app:latest .
-          
-    - name: Deploy to minikube
-      run: kubectl apply -f k8s-node-app.yaml
-      
-    - name: Wait for pods
-      run: |
-        sleep 30
-        kubectl get pods -o wide
-        
-    - name: Check pod status
-      run: |
-        kubectl describe pod -l app=nodejs-app
-        kubectl logs -l app=nodejs-app
-        
-    - name: Test service
-      run: |
-        minikube service list
-        sleep 10
-        SERVICE_URL=$(minikube service nodejs-app --url)
-        echo "Service URL: $SERVICE_URL"
-        curl $SERVICE_URL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app
+  labels:
+    app: nodejs-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-app
+    spec:
+      containers:
+      - name: nodejs-app
+        image: devopshint/node-app:latest
+        imagePullPolicy: Never  # Critical for Minikube
+        ports:
+        - containerPort: 3000
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-app
+spec:
+  selector:
+    app: nodejs-app
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
