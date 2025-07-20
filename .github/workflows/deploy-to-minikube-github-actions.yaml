@@ -26,3 +26,9 @@ jobs:
       run: |
           minikube service list
           minikube service nodejs-app --url
+    # Add after "Deploy to minikube" step
+    - name: Check pod status
+      run: |
+        kubectl get pods
+        kubectl describe pod -l app=nodejs-app
+        kubectl logs -l app=nodejs-app
